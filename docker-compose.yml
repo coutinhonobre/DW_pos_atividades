@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: dw_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - "./scripts/northwind.sql:/docker-entrypoint-initdb.d/01-northwind.sql:ro"
+      - "./scripts/dw_postgres.sql:/docker-entrypoint-initdb.d/02-dw-schema.sql:ro"
+      - "./scripts/metadados_postgres.sql:/docker-entrypoint-initdb.d/03-metadados.sql:ro"
+
+  mysql:
+    image: mysql:8.4
+    container_name: dw_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql
+    ports:
+      - "3306:3306"
+    volumes:
+      - "./scripts/mercearia_mysql.sql:/docker-entrypoint-initdb.d/01-mercearia.sql:ro"
+      - "./scripts/mercearia_data_mysql.sql:/docker-entrypoint-initdb.d/02-mercearia-data.sql:ro"
