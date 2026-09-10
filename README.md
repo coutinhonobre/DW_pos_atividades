@@ -8,7 +8,7 @@ campo.
 ## Estrutura
 
 ```
-docker-compose.yml          sobe os 3 bancos (mercearia, northwind, dw)
+docker-compose.yml          sobe os bancos (mercearia, northwind, dw) + Airflow
 start.sh                    recria tudo do zero (schema + dados)
 scripts/
   mercearia_mysql.sql       schema transacional da Mercearia (MySQL)
@@ -17,6 +17,8 @@ scripts/
   dw_postgres.sql           schema do Data Warehouse (Postgres, banco `dw`)
   metadados_postgres.sql    schema do catálogo de metadados (schema `metadados` no banco `dw`)
   metadados_seed_postgres.sql  inserts de metadados (execução manual, ver abaixo)
+airflow/
+  dags/carga_inicial_dw.py  DAG da primeira carga do DW (ver seção Airflow)
 diagrams/
   dw_modelo_estrela.drawio  diagrama do modelo estrela do DW
   metadados_modelo.drawio   diagrama do modelo de metadados
@@ -89,6 +91,39 @@ dois sistemas ao mesmo tempo (ex: `dim_cliente.nome_cliente` ← `Pessoas.NOME`
 e ← `customers.company_name`).
 
 Diagrama: `diagrams/metadados_modelo.drawio`.
+
+## Airflow — primeira carga do DW
+
+Instância `standalone` (webserver + scheduler em um único container,
+`apache/airflow:latest`), disponível em `http://localhost:8080` depois do
+`./start.sh` (leva 1-2 min pra subir).
+
+- Usuário: `airflow` / Senha: `airflow`
+
+(fixos via `AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS` +
+`airflow/simple_auth_manager_passwords.json`, montado no container — sem isso
+o Airflow geraria uma senha aleatória a cada start)
+
+A DAG `carga_inicial_dw` extrai da Mercearia (MySQL) e do Northwind (Postgres)
+e carrega as tabelas do `dw` que a inicialização do schema deixa vazias
+(`dim_tempo` já vem populada por `dw_postgres.sql`, via `generate_series`):
+
+1. `carregar_dim_enderecos`, `carregar_dim_produtos`, `carregar_dim_cliente`,
+   `carregar_dim_funcionario`, `carregar_dim_transportadora` — em paralelo
+2. `carregar_fato_vendas`, `carregar_fato_compras` — depois das dimensões,
+   pois fazem lookup da chave substituta de cada dimensão
+
+Ela não tem `schedule` (é disparo manual — faz sentido para uma carga
+inicial) e é idempotente nas dimensões (`ON CONFLICT DO NOTHING` pela chave
+natural `sistema_origem` + id de origem); os fatos são recriados do zero a
+cada execução (`DELETE` antes do `INSERT`).
+
+Pra disparar pela UI: acesse `localhost:8080`, ative a DAG e clique em
+"Trigger DAG". Pela CLI:
+
+```bash
+docker exec dw_airflow airflow dags trigger carga_inicial_dw
+```
 
 ## Conexão via DBeaver / cliente SQL
 

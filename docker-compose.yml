@@ -1,4 +1,11 @@
 services:
+
+  # ============================================================
+  # ETAPA 1 — Bancos transacionais + Data Warehouse + Metadados
+  # ============================================================
+
+  # Northwind (schema + dados) e o Data Warehouse (schema `dw`, incluindo
+  # o schema de metadados) vivem no mesmo servidor Postgres.
   postgres:
     image: postgres:16
     container_name: dw_postgres
@@ -13,6 +20,7 @@ services:
       - "./scripts/dw_postgres.sql:/docker-entrypoint-initdb.d/02-dw-schema.sql:ro"
       - "./scripts/metadados_postgres.sql:/docker-entrypoint-initdb.d/03-metadados.sql:ro"
 
+  # Mercearia (schema + dados fake)
   mysql:
     image: mysql:8.4
     container_name: dw_mysql
@@ -23,3 +31,28 @@ services:
     volumes:
       - "./scripts/mercearia_mysql.sql:/docker-entrypoint-initdb.d/01-mercearia.sql:ro"
       - "./scripts/mercearia_data_mysql.sql:/docker-entrypoint-initdb.d/02-mercearia-data.sql:ro"
+
+  # ============================================================
+  # ETAPA 2 — Orquestração de ETL (Airflow)
+  # ============================================================
+
+  # Instância standalone (webserver + scheduler em um único processo,
+  # metadados do próprio Airflow em SQLite). Roda a DAG carga_inicial_dw,
+  # que lê da Mercearia e do Northwind e popula as tabelas do DW.
+  airflow:
+    image: apache/airflow:latest
+    container_name: dw_airflow
+    depends_on:
+      - postgres
+      - mysql
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "airflow:admin"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/opt/airflow/simple_auth_manager_passwords.json"
+      _PIP_ADDITIONAL_REQUIREMENTS: "pymysql psycopg2-binary"
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./airflow/dags:/opt/airflow/dags"
+      - "./airflow/simple_auth_manager_passwords.json:/opt/airflow/simple_auth_manager_passwords.json"
+    command: standalone

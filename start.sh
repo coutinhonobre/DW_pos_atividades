@@ -14,4 +14,6 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
-echo "Pronto. Postgres em localhost:5432 (northwind) e MySQL em localhost:3306 (mercearia)."
+echo "Pronto. Postgres em localhost:5432 (northwind/dw) e MySQL em localhost:3306 (mercearia)."
+echo "Airflow em http://localhost:8080 (pode levar 1-2 min pra ficar disponível)."
+echo "Usuário/senha do Airflow: veja 'docker logs dw_airflow' (gerados no primeiro start)."
