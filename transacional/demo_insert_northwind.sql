@@ -1,5 +1,5 @@
--- Demo: simula um novo pedido no Northwind.
--- Rodar: docker exec -i dw_postgres psql -U postgres -d northwind < scripts/demo_insert_northwind.sql
+-- Demo: simula um novo pedido no Northwind pra apresentar a carga incremental.
+-- Rodar: docker exec -i dw_postgres psql -U postgres -d northwind < transacional/demo_insert_northwind.sql
 -- Usa MAX(order_id)+1 em vez de id fixo, então pode rodar mais de uma vez sem colidir.
 
 INSERT INTO orders (order_id, customer_id, employee_id, order_date, ship_via)
