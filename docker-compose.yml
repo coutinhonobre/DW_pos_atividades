@@ -16,9 +16,11 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - "./scripts/northwind.sql:/docker-entrypoint-initdb.d/01-northwind.sql:ro"
-      - "./scripts/dw_postgres.sql:/docker-entrypoint-initdb.d/02-dw-schema.sql:ro"
-      - "./scripts/metadados_postgres.sql:/docker-entrypoint-initdb.d/03-metadados.sql:ro"
+      - "./transacional/northwind.sql:/docker-entrypoint-initdb.d/01-northwind.sql:ro"
+      - "./dw/dw_postgres.sql:/docker-entrypoint-initdb.d/02-dw-schema.sql:ro"
+      - "./dw/metadados_postgres.sql:/docker-entrypoint-initdb.d/03-metadados.sql:ro"
+      - "./dw/staging_postgres.sql:/docker-entrypoint-initdb.d/04-staging.sql:ro"
+      - "./data_marting/dw_postgres.sql:/docker-entrypoint-initdb.d/05-data-marting.sql:ro"
 
   # Mercearia (schema + dados fake)
   mysql:
@@ -29,8 +31,8 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - "./scripts/mercearia_mysql.sql:/docker-entrypoint-initdb.d/01-mercearia.sql:ro"
-      - "./scripts/mercearia_data_mysql.sql:/docker-entrypoint-initdb.d/02-mercearia-data.sql:ro"
+      - "./transacional/mercearia_mysql.sql:/docker-entrypoint-initdb.d/01-mercearia.sql:ro"
+      - "./transacional/mercearia_data_mysql.sql:/docker-entrypoint-initdb.d/02-mercearia-data.sql:ro"
 
   # ============================================================
   # ETAPA 2 — Orquestração de ETL (Airflow)

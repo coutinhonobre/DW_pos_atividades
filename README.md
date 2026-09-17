@@ -10,18 +10,27 @@ campo.
 ```
 docker-compose.yml          sobe os bancos (mercearia, northwind, dw) + Airflow
 start.sh                    recria tudo do zero (schema + dados)
-scripts/
+transacional/                caminho dos sistemas de origem (OLTP)
   mercearia_mysql.sql       schema transacional da Mercearia (MySQL)
   mercearia_data_mysql.sql  dados fake da Mercearia (gerados com Faker pt_BR)
   northwind.sql             schema + dados do Northwind (Postgres, dump original)
-  dw_postgres.sql           schema do Data Warehouse (Postgres, banco `dw`)
+  demo_insert_mercearia.sql   inserts de teste na Mercearia
+  demo_insert_northwind.sql   inserts de teste no Northwind
+dw/                          camada corporativa integrada (Inmon: por assunto, normalizada)
+  dw_postgres.sql           schema normalizado do DW (schema `corporativo` no banco `dw`)
+  staging_postgres.sql      schema de staging (schema `staging` no banco `dw`), usado pela carga incremental
   metadados_postgres.sql    schema do catálogo de metadados (schema `metadados` no banco `dw`)
   metadados_seed_postgres.sql  inserts de metadados (execução manual, ver abaixo)
+data_marting/                 camada de data marts (dimensional, dependente do DW normalizado)
+  dw_postgres.sql           schema do data mart em estrela (Postgres, banco `dw`)
+  demo_check_dw.sql         queries de conferência dos dados carregados
 airflow/
-  dags/carga_inicial_dw.py  DAG da primeira carga do DW (ver seção Airflow)
+  dags/carga_inicial_dw.py      DAG da primeira carga do DW (ver seção Airflow)
+  dags/carga_incremental_dw.py  DAG da carga parcial/incremental (ver seção Airflow)
 diagrams/
-  dw_modelo_estrela.drawio  diagrama do modelo estrela do DW
-  metadados_modelo.drawio   diagrama do modelo de metadados
+  dw_modelo_corporativo.drawio  diagrama do DW normalizado por assunto (dw/dw_postgres.sql)
+  dw_modelo_estrela.drawio      diagrama do data mart em estrela (data_marting/dw_postgres.sql)
+  metadados_modelo.drawio       diagrama do modelo de metadados
 apresentacao/
   Slides_Dw Diniz.pdf       material de referência do professor
 ```
@@ -51,10 +60,44 @@ Banco transacional de uma mercearia (vendas, compras, pessoas, produtos, endere�
 Base de exemplo clássica (distribuidora de alimentos por atacado). Vem com os
 dados originais do dump (830 pedidos).
 
-### DW — PostgreSQL, `localhost:5432`, banco `dw`
+### DW normalizado — PostgreSQL, `localhost:5432`, banco `dw`, schema `corporativo`
 
-Modelo estrela integrando os dois sistemas transacionais. Grão dos fatos: item
-vendido / item comprado (uma linha por produto dentro de uma venda ou compra).
+Modelo corporativo do Inmon: orientado a assunto, integrado, não-volátil e
+variante no tempo. Organizado em 4 assuntos, independentes de qualquer
+sistema de origem:
+
+- **Geografia** — `pais`, `estado`, `cidade`, `endereco`
+- **Pessoas** — `profissao`, `cliente`, `cargo`, `funcionario`
+- **Produto e Parceiros** — `categoria`, `produto`, `transportadora`, `fornecedor`
+- **Transações** — `venda`, `item_venda`, `compra`, `item_compra`
+
+Integrado: toda entidade que vem de sistema transacional traz `sistema_origem`
++ `id_..._origem`, resolvendo Northwind/Mercearia para uma chave corporativa
+única (sequência própria, ex. `corporativo.seq_cliente`).
+
+Não-volátil / variante no tempo: `cliente`, `funcionario` e `produto` nunca
+sofrem `UPDATE` nos atributos que mudam — uma alteração insere uma nova linha
+(`data_inicio_validade` / `data_fim_validade` / `flag_atual`), preservando o
+histórico. Por isso a PK dessas três tabelas é composta
+(`id_..., data_inicio_validade`).
+
+Como `venda` / `item_venda` / `compra` / `item_compra` guardam só o id natural
+(não a versão), a ligação com `cliente` / `funcionario` / `produto` é uma
+**junção temporal** (id + data do evento dentro do intervalo de validade), não
+uma FK simples — por isso essas colunas não têm `REFERENCES` formal, só
+comentário no DDL.
+
+Diagrama: `diagrams/dw_modelo_corporativo.drawio`.
+
+### Data Mart (estrela) — banco `dw`, schema `public`
+
+Data mart dimensional (Kimball) derivado do DW normalizado acima, hoje ainda
+único e combinando os dois processos de negócio (vendas e compras) em vez de
+ser separado por fato — próximo passo é quebrar em um mart por fato (Vendas,
+Compras), cada um com suas próprias dimensões conformadas.
+
+Grão dos fatos: item vendido / item comprado (uma linha por produto dentro de
+uma venda ou compra).
 
 - `dim_tempo`, `dim_enderecos`, `dim_produtos`, `dim_cliente` — dimensões
   conformadas, compartilhadas pelos dois sistemas (`sistema_origem` identifica
@@ -82,7 +125,7 @@ O schema é criado junto com o `dw` (via `start.sh`), mas fica **vazio** — os
 dados são propositalmente inseridos à parte, executando manualmente:
 
 ```bash
-docker exec -i dw_postgres psql -U postgres < scripts/metadados_seed_postgres.sql
+docker exec -i dw_postgres psql -U postgres < dw/metadados_seed_postgres.sql
 ```
 
 O seed documenta 28 tabelas / 158 campos transacionais, 8 tabelas / 88 campos
@@ -123,6 +166,38 @@ Pra disparar pela UI: acesse `localhost:8080`, ative a DAG e clique em
 
 ```bash
 docker exec dw_airflow airflow dags trigger carga_inicial_dw
+```
+
+## Airflow — carga incremental (parcial) do DW
+
+A DAG `carga_incremental_dw` traz só o que mudou desde a última carga, sem
+olhar data — o corte é pelo **maior id de origem já presente na fato**
+(`MAX(id_venda_original)` / `MAX(id_compra_original)`), então uma venda com
+data retroativa lançada depois também seria pega, e uma venda "de hoje" que
+já foi carregada não seria reprocessada.
+
+Fluxo (schema `staging` dentro do banco `dw`, como área intermediária):
+
+1. **Staging** — `stage_vendas_mercearia`, `stage_vendas_northwind`,
+   `stage_compras_mercearia` comparam o watermark com a origem e jogam só as
+   linhas novas nas tabelas `staging.stg_*` (truncadas a cada execução)
+2. **Dimensões** — `atualizar_dim_*` olham só as chaves naturais que
+   apareceram na staging (não a tabela toda) e usam um upsert com
+   comparação: se a chave não existe ainda, `INSERT`; se existe mas algum
+   atributo mudou, `UPDATE`; se está igual, não toca em nada
+3. **Fatos** — `carregar_fato_vendas`/`carregar_fato_compras` inserem
+   (append-only) só as linhas que ficaram na staging, resolvendo as chaves
+   substitutas já atualizadas no passo anterior
+4. **Limpeza** — `limpar_staging` esvazia as tabelas de staging no final; elas
+   só têm dado enquanto a DAG está rodando
+
+Importante: a atualização de dimensão só acontece para entidades que
+aparecem em algum fato novo dessa execução — se um cliente mudar de renda
+mas não comprar nada nessa leva, a mudança só é refletida na próxima vez que
+ele aparecer em uma venda/compra nova.
+
+```bash
+docker exec dw_airflow airflow dags trigger carga_incremental_dw
 ```
 
 ## Conexão via DBeaver / cliente SQL

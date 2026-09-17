@@ -203,7 +203,6 @@ CREATE TABLE shippers (
 );
 
 
-
 --
 -- Name: suppliers; Type: TABLE; Schema: public; Owner: -; Tablespace: 
 --
