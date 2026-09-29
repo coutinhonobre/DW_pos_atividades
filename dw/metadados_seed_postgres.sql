@@ -209,12 +209,12 @@ INSERT INTO metadados.assunto_dw (id_assunto, nome_assunto, descricao) VALUES
 (3, 'Compras', 'Processo de compra de produtos de fornecedores (exclusivo da Mercearia)');
 
 INSERT INTO metadados.tabela_dw (id_tabela_dw, id_assunto, nome_tabela, tipo_tabela, grao, periodicidade_carga) VALUES
-(1, 1, 'dim_tempo', 'Dimensão', NULL, 'Diária'),
+(1, 1, 'dim_tempos', 'Dimensão', NULL, 'Diária'),
 (2, 1, 'dim_enderecos', 'Dimensão', NULL, 'Diária'),
 (3, 1, 'dim_produtos', 'Dimensão', NULL, 'Diária'),
-(4, 1, 'dim_cliente', 'Dimensão', NULL, 'Diária'),
-(5, 1, 'dim_funcionario', 'Dimensão', NULL, 'Diária'),
-(6, 1, 'dim_transportadora', 'Dimensão', NULL, 'Diária'),
+(4, 1, 'dim_clientes', 'Dimensão', NULL, 'Diária'),
+(5, 1, 'dim_funcionarios', 'Dimensão', NULL, 'Diária'),
+(6, 1, 'dim_transportadoras', 'Dimensão', NULL, 'Diária'),
 (7, 2, 'fato_vendas', 'Fato', '1 linha por produto vendido dentro de uma venda/pedido', 'Diária'),
 (8, 3, 'fato_compras', 'Fato', '1 linha por produto comprado dentro de um pedido de compra', 'Diária');
 
@@ -309,10 +309,10 @@ INSERT INTO metadados.campo_dw (id_campo, id_tabela_dw, id_tipo_campo, nome_camp
 (88, 8, 4, 'data_carga', NULL, 'Atributo', NULL, NULL);
 
 INSERT INTO metadados.dado_externo (id_dado_externo, nome_dado_externo, descricao, periodicidade) VALUES
-(1, 'Calendário Gregoriano', 'Referência de datas usada para popular a dim_tempo via generate_series, sem vínculo com nenhum sistema transacional', 'Estática');
+(1, 'Calendário Gregoriano', 'Referência de datas usada para popular a dim_tempos via generate_series, sem vínculo com nenhum sistema transacional', 'Estática');
 
 INSERT INTO metadados.dado_externo_conteudo (id_conteudo, id_dado_externo, conteudo, data, complemento) VALUES
-(1, 1, '1996-01-01 a 2025-12-31', NULL, 'Intervalo coberto pela dim_tempo (cobre o período do Northwind e da Mercearia)');
+(1, 1, '1996-01-01 a 2025-12-31', NULL, 'Intervalo coberto pela dim_tempos (cobre o período do Northwind e da Mercearia)');
 
 INSERT INTO metadados.algoritmo_etl (id_algoritmo, nome_algoritmo, descricao, referencia_codigo) VALUES
 (1, 'Geração de calendário via generate_series', 'Gera uma linha por dia no intervalo definido, extraindo dia/mês/ano/trimestre/dia da semana', 'scripts/dw_postgres.sql'),
