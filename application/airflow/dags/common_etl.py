@@ -39,6 +39,15 @@ def get_id_tempo(cur, data):
     return cur.fetchone()[0]
 
 
+def get_id_tempo_nullable(cur, data):
+    """Igual a get_id_tempo, mas devolve None se a data for None — usado em
+    shipped_date/required_date do Northwind, que podem não estar preenchidas
+    (pedido ainda não expedido)."""
+    if data is None:
+        return None
+    return get_id_tempo(cur, data)
+
+
 def get_mysql_conn():
     return pymysql.connect(
         host="mysql", port=3306, user="root", password="mysql",
@@ -177,23 +186,28 @@ def upsert_simples(cur, tabela, id_col, natural_cols, natural_vals, cols, novos_
     return id_atual
 
 
-def upsert_historizado(cur, tabela, id_col, natural_cols, natural_vals, cols, novos_valores):
+def upsert_historizado(cur, tabela, id_versao_col, id_natural_col, natural_cols, natural_vals, cols, novos_valores):
     """
     Cliente/Funcionario/Produto: nunca sofrem UPDATE nos atributos versionados.
     - Chave natural nova: insere a primeira versão.
     - Já existe e mudou algum atributo: fecha a versão atual (flag_atual=false,
-      data_fim_validade=ontem) e insere uma nova versão com o mesmo id natural.
+      data_fim_validade=ontem) e insere uma nova versão com o mesmo id natural
+      ({id_natural_col}, estável entre versões) e um id de versão novo.
     - Já existe e não mudou nada: não faz nada.
-    Retorna o id natural (estável entre versões).
+
+    Retorna {id_versao_col} (PK real da tabela, uma linha por versão) — é o
+    valor que fatos/junções devem guardar como FK, resolvido aqui no ETL e
+    não em tempo de consulta.
 
     Limitação conhecida: data_inicio_validade tem granularidade de dia, então
-    duas mudanças reais de atributo no mesmo dia colidem na PK composta
-    (id, data). Para este projeto (cargas em lote, não streaming) não é um
-    cenário esperado.
+    duas mudanças reais de atributo no mesmo dia colidem na UNIQUE
+    (sistema_origem, id_..._origem, data_inicio_validade). Para este projeto
+    (cargas em lote, não streaming) não é um cenário esperado.
     """
     where = " AND ".join(f"{c} = %s" for c in natural_cols)
     cur.execute(
-        f"SELECT {id_col}, {','.join(cols)} FROM corporativo.{tabela} WHERE {where} AND flag_atual = TRUE",
+        f"SELECT {id_versao_col}, {id_natural_col}, {','.join(cols)} FROM corporativo.{tabela} "
+        f"WHERE {where} AND flag_atual = TRUE",
         natural_vals,
     )
     atual = cur.fetchone()
@@ -202,26 +216,27 @@ def upsert_historizado(cur, tabela, id_col, natural_cols, natural_vals, cols, no
         cur.execute(
             f"INSERT INTO corporativo.{tabela} ({','.join(natural_cols)}, {','.join(cols)}) "
             f"VALUES ({','.join(['%s'] * len(natural_vals))}, {','.join(['%s'] * len(cols))}) "
-            f"RETURNING {id_col}",
+            f"RETURNING {id_versao_col}",
             (*natural_vals, *novos_valores),
         )
         return cur.fetchone()[0]
 
-    id_atual, *valores_atuais = atual
+    id_versao_atual, id_natural_atual, *valores_atuais = atual
     if _valores_iguais(valores_atuais, novos_valores):
-        return id_atual
+        return id_versao_atual
 
     cur.execute(
         f"UPDATE corporativo.{tabela} SET flag_atual = FALSE, data_fim_validade = CURRENT_DATE - 1 "
-        f"WHERE {id_col} = %s AND flag_atual = TRUE",
-        (id_atual,),
+        f"WHERE {id_versao_col} = %s",
+        (id_versao_atual,),
     )
     cur.execute(
-        f"INSERT INTO corporativo.{tabela} ({id_col}, {','.join(natural_cols)}, {','.join(cols)}) "
-        f"VALUES (%s, {','.join(['%s'] * len(natural_vals))}, {','.join(['%s'] * len(cols))})",
-        (id_atual, *natural_vals, *novos_valores),
+        f"INSERT INTO corporativo.{tabela} ({id_natural_col}, {','.join(natural_cols)}, {','.join(cols)}) "
+        f"VALUES (%s, {','.join(['%s'] * len(natural_vals))}, {','.join(['%s'] * len(cols))}) "
+        f"RETURNING {id_versao_col}",
+        (id_natural_atual, *natural_vals, *novos_valores),
     )
-    return id_atual
+    return cur.fetchone()[0]
 
 
 # ----------------------------------------------------------------
@@ -353,31 +368,34 @@ def inserir_corporativo_venda_mercearia(cur, id_venda_origem, id_pessoa, data_ve
     chave = ("Mercearia", str(id_venda_origem))
     if chave not in venda_id_cache:
         cur.execute(
-            "SELECT id_cliente, id_endereco FROM corporativo.clientes "
+            "SELECT id_versao_cliente, id_endereco FROM corporativo.clientes "
             "WHERE sistema_origem = 'Mercearia' AND id_cliente_origem = %s AND flag_atual = TRUE",
             (str(id_pessoa),),
         )
-        id_cliente, id_endereco_cliente = cur.fetchone()
+        id_versao_cliente, id_endereco_cliente = cur.fetchone()
         id_tempo = get_id_tempo(cur, data_venda)
         cur.execute(
             "INSERT INTO corporativo.vendas "
-            "(sistema_origem, id_venda_origem, id_tempo, tipo_venda, id_cliente, id_endereco_entrega) "
+            "(sistema_origem, id_venda_origem, id_tempo, tipo_venda, id_versao_cliente, id_endereco_entrega) "
             "VALUES (%s,%s,%s,%s,%s,%s) RETURNING id_venda",
-            ("Mercearia", str(id_venda_origem), id_tempo, TIPO_VENDA_MAP.get(tipo_venda), id_cliente, id_endereco_cliente),
+            ("Mercearia", str(id_venda_origem), id_tempo, TIPO_VENDA_MAP.get(tipo_venda), id_versao_cliente, id_endereco_cliente),
         )
         venda_id_cache[chave] = cur.fetchone()[0]
     return venda_id_cache[chave]
 
 
-def inserir_corporativo_venda_northwind(cur, order_id, customer_id, employee_id, order_date, ship_via, venda_id_cache):
+def inserir_corporativo_venda_northwind(
+    cur, order_id, customer_id, employee_id, order_date, ship_via, venda_id_cache,
+    required_date=None, shipped_date=None, freight=None,
+):
     chave = ("Northwind", str(order_id))
     if chave not in venda_id_cache:
         cur.execute(
-            "SELECT id_cliente FROM corporativo.clientes "
+            "SELECT id_versao_cliente FROM corporativo.clientes "
             "WHERE sistema_origem = 'Northwind' AND id_cliente_origem = %s AND flag_atual = TRUE",
             (customer_id,),
         )
-        id_cliente = cur.fetchone()[0]
+        id_versao_cliente = cur.fetchone()[0]
         cur.execute(
             "SELECT id_endereco FROM corporativo.enderecos WHERE sistema_origem = 'Northwind' AND id_endereco_origem = %s",
             (customer_id,),
@@ -385,15 +403,15 @@ def inserir_corporativo_venda_northwind(cur, order_id, customer_id, employee_id,
         r_end = cur.fetchone()
         id_endereco_entrega = r_end[0] if r_end else None
 
-        id_funcionario = -1
+        id_versao_funcionario = -1
         if employee_id:
             cur.execute(
-                "SELECT id_funcionario FROM corporativo.funcionarios "
+                "SELECT id_versao_funcionario FROM corporativo.funcionarios "
                 "WHERE sistema_origem = 'Northwind' AND id_funcionario_origem = %s AND flag_atual = TRUE",
                 (str(employee_id),),
             )
             r_func = cur.fetchone()
-            id_funcionario = r_func[0] if r_func else -1
+            id_versao_funcionario = r_func[0] if r_func else -1
 
         id_transportadora = -1
         if ship_via:
@@ -406,22 +424,44 @@ def inserir_corporativo_venda_northwind(cur, order_id, customer_id, employee_id,
             id_transportadora = r_transp[0] if r_transp else -1
 
         id_tempo = get_id_tempo(cur, order_date)
+        id_tempo_envio = get_id_tempo_nullable(cur, shipped_date)
+        id_tempo_prazo = get_id_tempo_nullable(cur, required_date)
         cur.execute(
             "INSERT INTO corporativo.vendas "
-            "(sistema_origem, id_venda_origem, id_tempo, id_cliente, id_funcionario, id_transportadora, id_endereco_entrega) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id_venda",
-            ("Northwind", str(order_id), id_tempo, id_cliente, id_funcionario, id_transportadora, id_endereco_entrega),
+            "(sistema_origem, id_venda_origem, id_tempo, id_versao_cliente, id_versao_funcionario, id_transportadora, "
+            "id_endereco_entrega, frete, id_tempo_envio, id_tempo_prazo) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id_venda",
+            (
+                "Northwind", str(order_id), id_tempo, id_versao_cliente, id_versao_funcionario, id_transportadora,
+                id_endereco_entrega, freight, id_tempo_envio, id_tempo_prazo,
+            ),
         )
         venda_id_cache[chave] = cur.fetchone()[0]
     return venda_id_cache[chave]
 
 
-def inserir_corporativo_item_venda(cur, id_venda, id_item_origem, id_produto, quantidade, valor_unitario, valor_desconto=0):
+def inserir_corporativo_item_venda(cur, sistema_origem, id_venda, id_item_origem, id_produto_origem, quantidade, valor_unitario, valor_desconto=0):
+    """
+    id_produto_origem é a chave natural do produto NO SISTEMA DE ORIGEM
+    (ex: Northwind product_id 1-77, Mercearia ID_PRODUTO 1-100) — nunca o
+    id_produto do corporativo, que vem de uma sequência própria
+    (corporativo.seq_produtos) compartilhada pelos dois sistemas e por isso
+    tem uma faixa de valores completamente diferente. Resolve aqui a versão
+    vigente do produto antes de inserir, senão itens_vendas.id_versao_produto
+    aponta pro produto errado sempre que as faixas de id colidirem entre os
+    dois sistemas de origem.
+    """
+    cur.execute(
+        "SELECT id_versao_produto FROM corporativo.produtos "
+        "WHERE sistema_origem = %s AND id_produto_origem = %s AND flag_atual = TRUE",
+        (sistema_origem, str(id_produto_origem)),
+    )
+    id_versao_produto = cur.fetchone()[0]
     cur.execute(
         "INSERT INTO corporativo.itens_vendas "
-        "(id_item_origem, id_venda, id_produto, quantidade, valor_unitario, valor_desconto) "
+        "(id_item_origem, id_venda, id_versao_produto, quantidade, valor_unitario, valor_desconto) "
         "VALUES (%s,%s,%s,%s,%s,%s)",
-        (id_item_origem, id_venda, id_produto, quantidade, valor_unitario, valor_desconto),
+        (id_item_origem, id_venda, id_versao_produto, quantidade, valor_unitario, valor_desconto),
     )
 
 
@@ -445,11 +485,19 @@ def inserir_corporativo_compra(cur, id_compra_origem, id_pessoa, data_pedido, da
     return compra_id_cache[chave]
 
 
-def inserir_corporativo_item_compra(cur, id_compra, id_item_origem, id_produto, quantidade, valor_unitario):
+def inserir_corporativo_item_compra(cur, id_compra, id_item_origem, id_produto_origem, quantidade, valor_unitario):
+    """id_produto_origem é a chave natural no sistema de origem — só a
+    Mercearia tem compras, ver comentário em inserir_corporativo_item_venda."""
     cur.execute(
-        "INSERT INTO corporativo.itens_compras (id_item_origem, id_compra, id_produto, quantidade, valor_unitario) "
+        "SELECT id_versao_produto FROM corporativo.produtos "
+        "WHERE sistema_origem = 'Mercearia' AND id_produto_origem = %s AND flag_atual = TRUE",
+        (str(id_produto_origem),),
+    )
+    id_versao_produto = cur.fetchone()[0]
+    cur.execute(
+        "INSERT INTO corporativo.itens_compras (id_item_origem, id_compra, id_versao_produto, quantidade, valor_unitario) "
         "VALUES (%s,%s,%s,%s,%s)",
-        (id_item_origem, id_compra, id_produto, quantidade, valor_unitario),
+        (id_item_origem, id_compra, id_versao_produto, quantidade, valor_unitario),
     )
 
 

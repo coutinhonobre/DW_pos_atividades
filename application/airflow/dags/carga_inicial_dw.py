@@ -119,7 +119,7 @@ def carregar_corporativo_produtos():
             for r in produtos_mercearia:
                 id_categoria = get_or_create_by_nome(cur, "categorias", "id_categoria", r["NOME_CATEGORIA"])
                 upsert_historizado(
-                    cur, "produtos", "id_produto", ["sistema_origem", "id_produto_origem"],
+                    cur, "produtos", "id_versao_produto", "id_produto", ["sistema_origem", "id_produto_origem"],
                     ["Mercearia", str(r["ID_PRODUTO"])],
                     ["nome", "valor", "moeda", "id_categoria"],
                     (r["PRODUTO"], r["VALOR_VENDA"], "BRL", id_categoria),
@@ -127,7 +127,7 @@ def carregar_corporativo_produtos():
             for product_id, product_name, unit_price, category_name in produtos_northwind:
                 id_categoria = get_or_create_by_nome(cur, "categorias", "id_categoria", category_name)
                 upsert_historizado(
-                    cur, "produtos", "id_produto", ["sistema_origem", "id_produto_origem"],
+                    cur, "produtos", "id_versao_produto", "id_produto", ["sistema_origem", "id_produto_origem"],
                     ["Northwind", str(product_id)],
                     ["nome", "valor", "moeda", "id_categoria"],
                     (product_name, unit_price, "USD", id_categoria),
@@ -178,7 +178,7 @@ def carregar_corporativo_cliente():
                     str(tel["DDD"]) if tel else None, TIPO_TELEFONE_MAP.get(tel["TIPO"]) if tel else None,
                 )
                 upsert_historizado(
-                    cur, "clientes", "id_cliente", ["sistema_origem", "id_cliente_origem"],
+                    cur, "clientes", "id_versao_cliente", "id_cliente", ["sistema_origem", "id_cliente_origem"],
                     ["Mercearia", str(p["ID_PESSOA"])],
                     ["tipo_pessoa", "nome", "sexo", "faixa_renda", "estado_civil", "ano_nascimento",
                      "id_profissao", "id_endereco", "ddd_telefone", "numero_telefone"],
@@ -197,7 +197,7 @@ def carregar_corporativo_cliente():
                     None, id_endereco, None, None,
                 )
                 upsert_historizado(
-                    cur, "clientes", "id_cliente", ["sistema_origem", "id_cliente_origem"],
+                    cur, "clientes", "id_versao_cliente", "id_cliente", ["sistema_origem", "id_cliente_origem"],
                     ["Northwind", customer_id],
                     ["tipo_pessoa", "nome", "sexo", "faixa_renda", "estado_civil", "ano_nascimento",
                      "id_profissao", "id_endereco", "ddd_telefone", "numero_telefone"],
@@ -234,7 +234,7 @@ def carregar_corporativo_funcionario():
                 )
                 id_cargo = get_or_create_by_nome(cur, "cargos", "id_cargo", title) if title else None
                 upsert_historizado(
-                    cur, "funcionarios", "id_funcionario", ["sistema_origem", "id_funcionario_origem"],
+                    cur, "funcionarios", "id_versao_funcionario", "id_funcionario", ["sistema_origem", "id_funcionario_origem"],
                     ["Northwind", str(eid)],
                     ["nome", "data_contratacao", "id_cargo", "id_endereco"],
                     (f"{first} {last}", hire_date, id_cargo, id_endereco),
@@ -327,6 +327,7 @@ def carregar_corporativo_vendas():
         with nw_conn.cursor() as cur:
             cur.execute("""
                 SELECT o.order_id, o.customer_id, o.employee_id, o.order_date, o.ship_via,
+                       o.required_date, o.shipped_date, o.freight,
                        od.product_id, od.quantity, od.unit_price, od.discount
                 FROM orders o JOIN order_details od ON od.order_id = o.order_id
             """)
@@ -342,14 +343,16 @@ def carregar_corporativo_vendas():
                 id_venda = inserir_corporativo_venda_mercearia(
                     cur, r["ID_VENDA"], r["ID_PESSOA"], r["DATA_VENDA"], r["TIPO_VENDA"], venda_id_cache,
                 )
-                inserir_corporativo_item_venda(cur, id_venda, str(r["ID_ITEMVENDA"]), r["ID_PRODUTO"], r["QUANTIDADE"], r["VLR_UNITARIO"])
+                inserir_corporativo_item_venda(cur, "Mercearia", id_venda, str(r["ID_ITEMVENDA"]), r["ID_PRODUTO"], r["QUANTIDADE"], r["VLR_UNITARIO"])
 
-            for order_id, customer_id, employee_id, order_date, ship_via, product_id, quantity, unit_price, discount in vendas_northwind:
+            for (order_id, customer_id, employee_id, order_date, ship_via, required_date, shipped_date, freight,
+                 product_id, quantity, unit_price, discount) in vendas_northwind:
                 id_venda = inserir_corporativo_venda_northwind(
                     cur, order_id, customer_id, employee_id, order_date, ship_via, venda_id_cache,
+                    required_date=required_date, shipped_date=shipped_date, freight=freight,
                 )
                 inserir_corporativo_item_venda(
-                    cur, id_venda, None, product_id, quantity, unit_price,
+                    cur, "Northwind", id_venda, None, product_id, quantity, unit_price,
                     float(unit_price) * float(quantity) * float(discount),
                 )
         pg_conn.commit()
@@ -498,11 +501,11 @@ def carregar_marting_fato_vendas():
             cur.execute("SELECT sistema_origem, id_transportadora_original, id_dim_transportadora FROM dim_transportadoras")
             transportadora_map = {(r[0], r[1]): r[2] for r in cur.fetchall()}
 
-            cur.execute("SELECT id_cliente, sistema_origem, id_cliente_origem FROM corporativo.clientes")
+            cur.execute("SELECT id_versao_cliente, sistema_origem, id_cliente_origem FROM corporativo.clientes")
             cliente_nat = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
-            cur.execute("SELECT id_produto, sistema_origem, id_produto_origem FROM corporativo.produtos")
+            cur.execute("SELECT id_versao_produto, sistema_origem, id_produto_origem FROM corporativo.produtos")
             produto_nat = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
-            cur.execute("SELECT id_funcionario, sistema_origem, id_funcionario_origem FROM corporativo.funcionarios")
+            cur.execute("SELECT id_versao_funcionario, sistema_origem, id_funcionario_origem FROM corporativo.funcionarios")
             funcionario_nat = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
             cur.execute("SELECT id_transportadora, sistema_origem, id_transportadora_origem FROM corporativo.transportadoras")
             transportadora_nat = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
@@ -511,25 +514,25 @@ def carregar_marting_fato_vendas():
 
             cur.execute("""
                 SELECT v.sistema_origem, v.id_venda_origem, iv.id_item_origem, v.id_tempo, v.tipo_venda,
-                       v.id_cliente, v.id_funcionario, v.id_transportadora, v.id_endereco_entrega,
-                       iv.id_produto, iv.quantidade, iv.valor_unitario, iv.valor_desconto
+                       v.id_versao_cliente, v.id_versao_funcionario, v.id_transportadora, v.id_endereco_entrega,
+                       iv.id_versao_produto, iv.quantidade, iv.valor_unitario, iv.valor_desconto
                 FROM corporativo.vendas v JOIN corporativo.itens_vendas iv ON iv.id_venda = v.id_venda
             """)
             vendas = cur.fetchall()
 
         rows = []
         for (sistema_origem, id_venda_origem, id_item_origem, id_tempo, tipo_venda,
-             id_cliente, id_funcionario, id_transportadora, id_endereco_entrega,
-             id_produto, quantidade, valor_unitario, valor_desconto) in vendas:
+             id_versao_cliente, id_versao_funcionario, id_transportadora, id_endereco_entrega,
+             id_versao_produto, quantidade, valor_unitario, valor_desconto) in vendas:
             valor_total = float(quantidade) * float(valor_unitario) - float(valor_desconto or 0)
             end_nat = endereco_nat.get(id_endereco_entrega)
             rows.append((
                 sistema_origem, id_venda_origem, id_item_origem,
                 tempo_map.get(id_tempo),
-                cliente_map.get(cliente_nat.get(id_cliente)),
-                produto_map.get(produto_nat.get(id_produto)),
+                cliente_map.get(cliente_nat.get(id_versao_cliente)),
+                produto_map.get(produto_nat.get(id_versao_produto)),
                 endereco_map.get(end_nat) if end_nat else None,
-                funcionario_map.get(funcionario_nat.get(id_funcionario), -1),
+                funcionario_map.get(funcionario_nat.get(id_versao_funcionario), -1),
                 transportadora_map.get(transportadora_nat.get(id_transportadora), -1),
                 tipo_venda, quantidade, valor_unitario, valor_desconto, valor_total,
             ))
@@ -563,7 +566,7 @@ def carregar_marting_fato_compras():
             cur.execute("SELECT sistema_origem, id_fornecedor_original, id_dim_fornecedor FROM dim_fornecedores")
             fornecedor_map = {(r[0], r[1]): r[2] for r in cur.fetchall()}
 
-            cur.execute("SELECT id_produto, sistema_origem, id_produto_origem FROM corporativo.produtos")
+            cur.execute("SELECT id_versao_produto, sistema_origem, id_produto_origem FROM corporativo.produtos")
             produto_nat = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
             cur.execute("SELECT id_endereco, sistema_origem, id_endereco_origem FROM corporativo.enderecos")
             endereco_nat = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
@@ -572,20 +575,20 @@ def carregar_marting_fato_compras():
 
             cur.execute("""
                 SELECT c.sistema_origem, c.id_compra_origem, ic.id_item_origem, c.id_tempo, c.lead_time_dias,
-                       c.id_fornecedor, c.id_endereco, ic.id_produto, ic.quantidade, ic.valor_unitario
+                       c.id_fornecedor, c.id_endereco, ic.id_versao_produto, ic.quantidade, ic.valor_unitario
                 FROM corporativo.compras c JOIN corporativo.itens_compras ic ON ic.id_compra = c.id_compra
             """)
             compras = cur.fetchall()
 
         rows = []
         for (sistema_origem, id_compra_origem, id_item_origem, id_tempo, lead_time_dias,
-             id_fornecedor, id_endereco, id_produto, quantidade, valor_unitario) in compras:
+             id_fornecedor, id_endereco, id_versao_produto, quantidade, valor_unitario) in compras:
             valor_total = float(quantidade) * float(valor_unitario)
             rows.append((
                 sistema_origem, id_compra_origem, id_item_origem,
                 tempo_map.get(id_tempo),
                 fornecedor_map.get(fornecedor_nat.get(id_fornecedor)),
-                produto_map.get(produto_nat.get(id_produto)),
+                produto_map.get(produto_nat.get(id_versao_produto)),
                 endereco_map.get(endereco_nat.get(id_endereco)),
                 quantidade, valor_unitario, valor_total, lead_time_dias,
             ))
@@ -599,6 +602,87 @@ def carregar_marting_fato_compras():
             """, rows)
         pg_conn.commit()
         print(f"fato_compras: {len(rows)} linhas carregadas a partir do corporativo")
+    finally:
+        pg_conn.close()
+
+
+def carregar_marting_fato_entregas():
+    """Mart Logística/Entregas: grão de pedido (cabeçalho), exclusivo do
+    Northwind (frete/prazo/data de envio não existem na Mercearia)."""
+    pg_conn = get_pg_conn("dw")
+    try:
+        with pg_conn.cursor() as cur:
+            cur.execute("DELETE FROM fato_entregas")
+
+            cur.execute("SELECT data, id_dim_tempo FROM dim_tempos")
+            tempo_map = {r[0]: r[1] for r in cur.fetchall()}
+            cur.execute("SELECT sistema_origem, id_cliente_original, id_dim_cliente FROM dim_clientes")
+            cliente_map = {(r[0], r[1]): r[2] for r in cur.fetchall()}
+            cur.execute("SELECT sistema_origem, id_funcionario_original, id_dim_funcionario FROM dim_funcionarios")
+            funcionario_map = {(r[0], r[1]): r[2] for r in cur.fetchall()}
+            cur.execute("SELECT sistema_origem, id_transportadora_original, id_dim_transportadora FROM dim_transportadoras")
+            transportadora_map = {(r[0], r[1]): r[2] for r in cur.fetchall()}
+            cur.execute("SELECT sistema_origem, id_endereco_original, id_dim_endereco FROM dim_enderecos")
+            endereco_map = {(r[0], r[1]): r[2] for r in cur.fetchall()}
+
+            cur.execute("SELECT id_versao_cliente, id_cliente_origem FROM corporativo.clientes WHERE sistema_origem = 'Northwind'")
+            cliente_nat = {r[0]: r[1] for r in cur.fetchall()}
+            cur.execute("SELECT id_versao_funcionario, id_funcionario_origem FROM corporativo.funcionarios WHERE sistema_origem = 'Northwind'")
+            funcionario_nat = {r[0]: r[1] for r in cur.fetchall()}
+            cur.execute("SELECT id_transportadora, id_transportadora_origem FROM corporativo.transportadoras WHERE sistema_origem = 'Northwind'")
+            transportadora_nat = {r[0]: r[1] for r in cur.fetchall()}
+            cur.execute("SELECT id_endereco, id_endereco_origem FROM corporativo.enderecos WHERE sistema_origem = 'Northwind'")
+            endereco_nat = {r[0]: r[1] for r in cur.fetchall()}
+
+            cur.execute("""
+                SELECT v.id_venda, v.id_venda_origem, v.id_versao_cliente, v.id_versao_funcionario, v.id_transportadora,
+                       v.id_endereco_entrega, v.frete,
+                       tp.data AS data_pedido, te.data AS data_envio, tr.data AS data_prazo
+                FROM corporativo.vendas v
+                JOIN corporativo.tempos tp ON tp.id_tempo = v.id_tempo
+                LEFT JOIN corporativo.tempos te ON te.id_tempo = v.id_tempo_envio
+                LEFT JOIN corporativo.tempos tr ON tr.id_tempo = v.id_tempo_prazo
+                WHERE v.sistema_origem = 'Northwind'
+            """)
+            vendas = cur.fetchall()
+
+            cur.execute("""
+                SELECT iv.id_venda, SUM(iv.quantidade * iv.valor_unitario - iv.valor_desconto)
+                FROM corporativo.itens_vendas iv
+                JOIN corporativo.vendas v ON v.id_venda = iv.id_venda
+                WHERE v.sistema_origem = 'Northwind'
+                GROUP BY iv.id_venda
+            """)
+            valor_pedido_map = {r[0]: r[1] for r in cur.fetchall()}
+
+        rows = []
+        for (id_venda, id_venda_origem, id_versao_cliente, id_versao_funcionario, id_transportadora,
+             id_endereco_entrega, frete, data_pedido, data_envio, data_prazo) in vendas:
+            prazo_dias = (data_prazo - data_pedido).days if data_prazo else None
+            dias_para_envio = (data_envio - data_pedido).days if data_envio else None
+            atraso_dias = (data_envio - data_prazo).days if (data_envio and data_prazo) else None
+            rows.append((
+                "Northwind", id_venda_origem,
+                tempo_map.get(data_pedido),
+                tempo_map.get(data_envio) if data_envio else None,
+                cliente_map.get(("Northwind", cliente_nat.get(id_versao_cliente))),
+                funcionario_map.get(("Northwind", funcionario_nat.get(id_versao_funcionario)), -1),
+                transportadora_map.get(("Northwind", transportadora_nat.get(id_transportadora)), -1),
+                endereco_map.get(("Northwind", endereco_nat.get(id_endereco_entrega))) if id_endereco_entrega else None,
+                valor_pedido_map.get(id_venda, 0),
+                frete, prazo_dias, dias_para_envio, atraso_dias,
+            ))
+
+        with pg_conn.cursor() as cur:
+            psycopg2.extras.execute_values(cur, """
+                INSERT INTO fato_entregas
+                    (sistema_origem, id_venda_original, id_dim_tempo_pedido, id_dim_tempo_envio,
+                     id_dim_cliente, id_dim_funcionario, id_dim_transportadora, id_dim_endereco,
+                     valor_pedido, valor_frete, prazo_dias, dias_para_envio, atraso_dias)
+                VALUES %s
+            """, rows)
+        pg_conn.commit()
+        print(f"fato_entregas: {len(rows)} linhas carregadas a partir do corporativo")
     finally:
         pg_conn.close()
 
@@ -629,6 +713,7 @@ with DAG(
     t_mart_dim_fornecedores = PythonOperator(task_id="carregar_marting_dim_fornecedores", python_callable=carregar_marting_dim_fornecedores)
     t_mart_fato_vendas = PythonOperator(task_id="carregar_marting_fato_vendas", python_callable=carregar_marting_fato_vendas)
     t_mart_fato_compras = PythonOperator(task_id="carregar_marting_fato_compras", python_callable=carregar_marting_fato_compras)
+    t_mart_fato_entregas = PythonOperator(task_id="carregar_marting_fato_entregas", python_callable=carregar_marting_fato_entregas)
 
     # geografia primeiro (endereco), depois quem depende dela; produtos e
     # transportadora são independentes. Sequência evita corrida nas
@@ -643,4 +728,4 @@ with DAG(
     mart_dims = [t_mart_dim_clientes, t_mart_dim_produtos, t_mart_dim_enderecos,
                  t_mart_dim_funcionarios, t_mart_dim_transportadoras, t_mart_dim_fornecedores]
     cross_downstream([t_corp_vendas, t_corp_compras], mart_dims)
-    cross_downstream(mart_dims, [t_mart_fato_vendas, t_mart_fato_compras])
+    cross_downstream(mart_dims, [t_mart_fato_vendas, t_mart_fato_compras, t_mart_fato_entregas])

@@ -206,7 +206,8 @@ INSERT INTO metadados.campo_transacional (id_campo, id_tabela, id_tipo_campo, no
 INSERT INTO metadados.assunto_dw (id_assunto, nome_assunto, descricao) VALUES
 (1, 'Dimensões Compartilhadas', 'Dimensões conformadas, reutilizadas por mais de um processo de negócio'),
 (2, 'Vendas', 'Processo de venda de produtos a clientes'),
-(3, 'Compras', 'Processo de compra de produtos de fornecedores (exclusivo da Mercearia)');
+(3, 'Compras', 'Processo de compra de produtos de fornecedores (exclusivo da Mercearia)'),
+(4, 'Logística e Entregas', 'Prazo e custo de expedição dos pedidos (exclusivo do Northwind — a Mercearia não expede fisicamente)');
 
 INSERT INTO metadados.tabela_dw (id_tabela_dw, id_assunto, nome_tabela, tipo_tabela, grao, periodicidade_carga) VALUES
 (1, 1, 'dim_tempos', 'Dimensão', NULL, 'Diária'),
@@ -216,7 +217,9 @@ INSERT INTO metadados.tabela_dw (id_tabela_dw, id_assunto, nome_tabela, tipo_tab
 (5, 1, 'dim_funcionarios', 'Dimensão', NULL, 'Diária'),
 (6, 1, 'dim_transportadoras', 'Dimensão', NULL, 'Diária'),
 (7, 2, 'fato_vendas', 'Fato', '1 linha por produto vendido dentro de uma venda/pedido', 'Diária'),
-(8, 3, 'fato_compras', 'Fato', '1 linha por produto comprado dentro de um pedido de compra', 'Diária');
+(8, 3, 'fato_compras', 'Fato', '1 linha por produto comprado dentro de um pedido de compra', 'Diária'),
+(9, 1, 'dim_fornecedores', 'Dimensão', NULL, 'Diária'),
+(10, 4, 'fato_entregas', 'Fato', '1 linha por pedido (cabeçalho da venda, não por item) — só Northwind', 'Diária');
 
 INSERT INTO metadados.campo_dw (id_campo, id_tabela_dw, id_tipo_campo, nome_campo, descricao, papel_campo, tamanho_campo, casa_decimal) VALUES
 (1, 1, 1, 'id_dim_tempo', NULL, 'PK', NULL, NULL),
@@ -299,20 +302,43 @@ INSERT INTO metadados.campo_dw (id_campo, id_tabela_dw, id_tipo_campo, nome_camp
 (78, 8, 2, 'id_compra_original', NULL, 'Atributo', NULL, NULL),
 (79, 8, 2, 'id_item_original', NULL, 'Atributo', NULL, NULL),
 (80, 8, 1, 'id_dim_tempo', NULL, 'FK', NULL, NULL),
-(81, 8, 1, 'id_dim_cliente', NULL, 'FK', NULL, NULL),
+(81, 8, 1, 'id_dim_fornecedor', NULL, 'FK', NULL, NULL),
 (82, 8, 1, 'id_dim_produto', NULL, 'FK', NULL, NULL),
 (83, 8, 1, 'id_dim_endereco', NULL, 'FK', NULL, NULL),
 (84, 8, 1, 'quantidade', NULL, 'Atributo', NULL, NULL),
 (85, 8, 5, 'valor_unitario', NULL, 'Atributo', NULL, NULL),
 (86, 8, 5, 'valor_total_item', NULL, 'Atributo', NULL, NULL),
 (87, 8, 1, 'lead_time_dias', NULL, 'Atributo', NULL, NULL),
-(88, 8, 4, 'data_carga', NULL, 'Atributo', NULL, NULL);
+(88, 8, 4, 'data_carga', NULL, 'Atributo', NULL, NULL),
+(89, 9, 1, 'id_dim_fornecedor', NULL, 'PK', NULL, NULL),
+(90, 9, 2, 'sistema_origem', NULL, 'Atributo', NULL, NULL),
+(91, 9, 2, 'id_fornecedor_original', NULL, 'Atributo', NULL, NULL),
+(92, 9, 2, 'nome_fornecedor', NULL, 'Atributo', NULL, NULL),
+(93, 9, 2, 'telefone', NULL, 'Atributo', NULL, NULL),
+(94, 9, 4, 'data_carga', NULL, 'Atributo', NULL, NULL),
+(95, 10, 1, 'id_fato_entrega', NULL, 'PK', NULL, NULL),
+(96, 10, 2, 'sistema_origem', NULL, 'Atributo', NULL, NULL),
+(97, 10, 2, 'id_venda_original', NULL, 'Atributo', NULL, NULL),
+(98, 10, 1, 'id_dim_tempo_pedido', NULL, 'FK', NULL, NULL),
+(99, 10, 1, 'id_dim_tempo_envio', NULL, 'FK', NULL, NULL),
+(100, 10, 1, 'id_dim_cliente', NULL, 'FK', NULL, NULL),
+(101, 10, 1, 'id_dim_funcionario', NULL, 'FK', NULL, NULL),
+(102, 10, 1, 'id_dim_transportadora', NULL, 'FK', NULL, NULL),
+(103, 10, 1, 'id_dim_endereco', NULL, 'FK', NULL, NULL),
+(104, 10, 5, 'valor_pedido', NULL, 'Atributo', NULL, NULL),
+(105, 10, 5, 'valor_frete', NULL, 'Atributo', NULL, NULL),
+(106, 10, 1, 'prazo_dias', NULL, 'Atributo', NULL, NULL),
+(107, 10, 1, 'dias_para_envio', NULL, 'Atributo', NULL, NULL),
+(108, 10, 1, 'atraso_dias', NULL, 'Atributo', NULL, NULL),
+(109, 10, 4, 'data_carga', NULL, 'Atributo', NULL, NULL);
 
 INSERT INTO metadados.dado_externo (id_dado_externo, nome_dado_externo, descricao, periodicidade) VALUES
-(1, 'Calendário Gregoriano', 'Referência de datas usada para popular a dim_tempos via generate_series, sem vínculo com nenhum sistema transacional', 'Estática');
+(1, 'Calendário Gregoriano', 'Referência de datas usada para popular a dim_tempos via generate_series, sem vínculo com nenhum sistema transacional', 'Estática'),
+(2, 'Regras de Negócio do ETL', 'Âncora para campos do DW cujo valor é atribuído diretamente pelo processo de ETL, sem correspondência em nenhuma coluna transacional (ex: sistema_origem, moeda padrão, fallback -1)', 'Estática');
 
 INSERT INTO metadados.dado_externo_conteudo (id_conteudo, id_dado_externo, conteudo, data, complemento) VALUES
-(1, 1, '1996-01-01 a 2025-12-31', NULL, 'Intervalo coberto pela dim_tempos (cobre o período do Northwind e da Mercearia)');
+(1, 1, '1996-01-01 a 2025-12-31', NULL, 'Intervalo coberto pela dim_tempos (cobre o período do Northwind e da Mercearia)'),
+(2, 2, 'Constantes do ETL', NULL, 'Usado pelas linhas de integracao_transacional_dw que documentam campos sem origem transacional (sistema_origem, moeda, fallback -1 quando o sistema de origem não possui o conceito)');
 
 INSERT INTO metadados.algoritmo_etl (id_algoritmo, nome_algoritmo, descricao, referencia_codigo) VALUES
 (1, 'Geração de calendário via generate_series', 'Gera uma linha por dia no intervalo definido, extraindo dia/mês/ano/trimestre/dia da semana', 'scripts/dw_postgres.sql'),
@@ -323,7 +349,10 @@ INSERT INTO metadados.algoritmo_etl (id_algoritmo, nome_algoritmo, descricao, re
 (6, 'Resolução de chave substituta via lookup na dimensão conformada', 'Busca a chave substituta (surrogate key) na dimensão a partir do valor natural vindo do sistema transacional', NULL),
 (7, 'Cálculo de valor total do item', 'quantidade × valor_unitário, descontando valor_desconto quando aplicável', NULL),
 (8, 'Cálculo de lead time', 'Diferença em dias entre a data de entrada e a data do pedido', NULL),
-(9, 'Concatenação de nome completo', 'Concatena first_name e last_name em um único campo de nome', NULL);
+(9, 'Concatenação de nome completo', 'Concatena first_name e last_name em um único campo de nome', NULL),
+(10, 'Atribuição de moeda fixa (BRL)', 'Grava BRL como moeda padrão em dim_produtos.moeda, já que o modelo não faz conversão cambial entre os sistemas de origem', NULL),
+(11, 'Cálculo de indicadores de prazo de entrega', 'Diferença em dias entre duas datas do pedido (prazo prometido, data real de envio, atraso vs. prometido) — mesma ideia do algoritmo 8 (lead time de compra), aplicada às três combinações de data do fato_entregas', NULL),
+(12, 'Agregação do valor total do pedido', 'Soma quantidade × valor_unitário (líquido de desconto) de todos os itens de uma venda/pedido, do grão de item (itens_vendas) para o grão de cabeçalho (fato_entregas)', NULL);
 
 INSERT INTO metadados.integracao_transacional_dw (id_integracao, id_campo_transacional, id_campo_dw, id_dado_externo_conteudo, id_algoritmo) VALUES
 (1, NULL, 2, 1, 1),
@@ -416,4 +445,36 @@ INSERT INTO metadados.integracao_transacional_dw (id_integracao, id_campo_transa
 (88, 55, 86, NULL, 7),
 (89, 56, 86, NULL, 7),
 (90, 49, 87, NULL, 8),
-(91, 50, 87, NULL, 8);
+(91, 50, 87, NULL, 8),
+(92, 26, 91, NULL, NULL),
+(93, 29, 92, NULL, NULL),
+(94, 38, 93, NULL, NULL),
+(95, NULL, 11, 2, 3),
+(96, NULL, 24, 2, 3),
+(97, NULL, 32, 2, 3),
+(98, NULL, 46, 2, 3),
+(99, NULL, 55, 2, 3),
+(100, NULL, 61, 2, 3),
+(101, NULL, 77, 2, 3),
+(102, NULL, 90, 2, 3),
+(103, NULL, 29, 2, 10),
+(104, NULL, 68, 2, 2),
+(105, NULL, 69, 2, 2),
+(106, NULL, 96, 2, 3),
+(107, 111, 97, NULL, NULL),
+(108, 114, 98, NULL, 6),
+(109, 116, 99, NULL, 6),
+(110, 112, 100, NULL, 6),
+(111, 113, 101, NULL, 6),
+(112, 117, 102, NULL, 6),
+(113, 112, 103, NULL, 6),
+(114, 108, 104, NULL, 12),
+(115, 109, 104, NULL, 12),
+(116, 110, 104, NULL, 12),
+(117, 118, 105, NULL, NULL),
+(118, 115, 106, NULL, 11),
+(119, 114, 106, NULL, 11),
+(120, 116, 107, NULL, 11),
+(121, 114, 107, NULL, 11),
+(122, 116, 108, NULL, 11),
+(123, 115, 108, NULL, 11);

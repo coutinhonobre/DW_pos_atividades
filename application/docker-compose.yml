@@ -1,0 +1,116 @@
+services:
+
+  # ============================================================
+  # ETAPA 1 — Bancos transacionais + Data Warehouse + Metadados
+  # ============================================================
+
+  # Northwind (schema + dados) e o Data Warehouse (schema `dw`, incluindo
+  # o schema de metadados) vivem no mesmo servidor Postgres.
+  postgres:
+    image: postgres:16
+    container_name: dw_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - "./transacional/northwind.sql:/docker-entrypoint-initdb.d/01-northwind.sql:ro"
+      - "./dw/dw_postgres.sql:/docker-entrypoint-initdb.d/02-dw-schema.sql:ro"
+      - "./dw/metadados_postgres.sql:/docker-entrypoint-initdb.d/03-metadados.sql:ro"
+      - "./dw/metadados_seed_postgres.sql:/docker-entrypoint-initdb.d/04-metadados-seed.sql:ro"
+      - "./dw/staging_postgres.sql:/docker-entrypoint-initdb.d/05-staging.sql:ro"
+      - "./data_marting/dw_postgres.sql:/docker-entrypoint-initdb.d/06-data-marting.sql:ro"
+
+  # Mercearia (schema + dados fake)
+  mysql:
+    image: mysql:8.4
+    container_name: dw_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql
+    ports:
+      - "3306:3306"
+    volumes:
+      - "./transacional/mercearia_mysql.sql:/docker-entrypoint-initdb.d/01-mercearia.sql:ro"
+      - "./transacional/mercearia_data_mysql.sql:/docker-entrypoint-initdb.d/02-mercearia-data.sql:ro"
+
+  # ============================================================
+  # ETAPA 2 — Orquestração de ETL (Airflow)
+  # ============================================================
+
+  # Instância standalone (webserver + scheduler em um único processo,
+  # metadados do próprio Airflow em SQLite). Roda a DAG carga_inicial_dw,
+  # que lê da Mercearia e do Northwind e popula as tabelas do DW.
+  airflow:
+    image: apache/airflow:latest
+    container_name: nwmerc_airflow
+    depends_on:
+      - postgres
+      - mysql
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      # Credenciais fixas de propósito (mesmo padrão de POSTGRES_PASSWORD/
+      # MYSQL_ROOT_PASSWORD/MB_ADMIN_PASSWORD usados no resto do projeto).
+      # O simple auth manager do Airflow só aceita senha via arquivo (não
+      # tem env var pra senha inline) — o `command` abaixo gera esse
+      # arquivo a partir das env vars aqui embaixo antes de subir.
+      AIRFLOW_AUTH_USERNAME: "airflow"
+      AIRFLOW_AUTH_PASSWORD: "airflow"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "airflow:admin"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/opt/airflow/simple_auth_manager_passwords.json"
+      _PIP_ADDITIONAL_REQUIREMENTS: "pymysql psycopg2-binary"
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./airflow/dags:/opt/airflow/dags"
+    command: >
+      bash -c '
+        printf "{\"%s\": \"%s\"}" "$$AIRFLOW_AUTH_USERNAME" "$$AIRFLOW_AUTH_PASSWORD" > /opt/airflow/simple_auth_manager_passwords.json &&
+        exec airflow standalone
+      '
+
+  # ============================================================
+  # ETAPA 3 — BI (Metabase), painéis sobre os data marts
+  # ============================================================
+
+  # Metadados do próprio Metabase ficam em H2 embarcado (arquivo dentro do
+  # container). Conecta no banco `dw` (schema `public`, os data marts) como
+  # fonte de dados de BI.
+  #
+  # container_name prefixado com nwmerc_ (em vez de dw_, usado pelo resto
+  # deste projeto) porque airflow/metabase/metabase-setup usam esses mesmos
+  # nomes literais no projeto irmão baseado no dataset da PRF — sem o
+  # prefixo, `docker compose up` colide com os containers (parados) daquele
+  # outro projeto.
+  metabase:
+    image: metabase/metabase:latest
+    container_name: nwmerc_metabase
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+
+  # Provisiona o Metabase via API (usuário admin, conexão com o `dw` e os
+  # dashboards "Painel Vendas"/"Painel Compras"/"Painel Logística -
+  # Northwind") assim que o serviço acima sobe. Roda uma vez e sai — não é
+  # um serviço de vida longa.
+  #
+  # Credenciais fixas de propósito (mesmo padrão de POSTGRES_PASSWORD/
+  # MYSQL_ROOT_PASSWORD usado no resto do projeto) — MB_ADMIN_PASSWORD
+  # precisa ter letra e número (regra do próprio Metabase no primeiro
+  # setup). Só têm efeito na primeira execução: o usuário já existe depois
+  # disso, então mudar aqui não troca a senha de uma instância já
+  # provisionada — para isso, altere pela UI do Metabase (ou refaça o
+  # `start.sh`, que recria os containers do zero).
+  metabase-setup:
+    build: ./metabase
+    container_name: nwmerc_metabase_setup
+    environment:
+      MB_ADMIN_EMAIL: "admin@metabase.com"
+      MB_ADMIN_PASSWORD: "Metabase123!"
+      MB_STANDARD_EMAIL: "metabase@metabase.com"
+      MB_STANDARD_PASSWORD: "metabase"
+    depends_on:
+      - metabase
+      - postgres

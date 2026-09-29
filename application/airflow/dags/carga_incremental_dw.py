@@ -103,7 +103,8 @@ def stage_vendas_northwind():
 
         with nw_conn.cursor() as cur:
             cur.execute("""
-                SELECT o.order_id, o.customer_id, o.employee_id, o.order_date, o.ship_via,
+                SELECT o.order_id, o.customer_id, o.employee_id, o.order_date,
+                       o.required_date, o.shipped_date, o.ship_via, o.freight,
                        od.product_id, od.quantity, od.unit_price, od.discount
                 FROM orders o
                 JOIN order_details od ON od.order_id = o.order_id
@@ -115,8 +116,8 @@ def stage_vendas_northwind():
             with pg_conn.cursor() as cur:
                 psycopg2.extras.execute_values(cur, """
                     INSERT INTO staging.stg_vendas_northwind
-                        (order_id, customer_id, employee_id, order_date, ship_via,
-                         product_id, quantity, unit_price, discount)
+                        (order_id, customer_id, employee_id, order_date, required_date, shipped_date,
+                         ship_via, freight, product_id, quantity, unit_price, discount)
                     VALUES %s
                 """, rows)
         pg_conn.commit()
@@ -280,7 +281,7 @@ def atualizar_corporativo_cliente():
                         str(tel["DDD"]) if tel else None, TIPO_TELEFONE_MAP.get(tel["TIPO"]) if tel else None,
                     )
                     upsert_historizado(
-                        cur, "clientes", "id_cliente", ["sistema_origem", "id_cliente_origem"],
+                        cur, "clientes", "id_versao_cliente", "id_cliente", ["sistema_origem", "id_cliente_origem"],
                         ["Mercearia", str(p["ID_PESSOA"])],
                         ["tipo_pessoa", "nome", "sexo", "faixa_renda", "estado_civil", "ano_nascimento",
                          "id_profissao", "id_endereco", "ddd_telefone", "numero_telefone"],
@@ -303,7 +304,7 @@ def atualizar_corporativo_cliente():
                     id_endereco = r_end[0] if r_end else None
                     novos = ("Jurídica", company_name, None, None, None, None, None, id_endereco, None, None)
                     upsert_historizado(
-                        cur, "clientes", "id_cliente", ["sistema_origem", "id_cliente_origem"],
+                        cur, "clientes", "id_versao_cliente", "id_cliente", ["sistema_origem", "id_cliente_origem"],
                         ["Northwind", customer_id],
                         ["tipo_pessoa", "nome", "sexo", "faixa_renda", "estado_civil", "ano_nascimento",
                          "id_profissao", "id_endereco", "ddd_telefone", "numero_telefone"],
@@ -346,7 +347,7 @@ def atualizar_corporativo_produtos():
                 for r in produtos_mercearia:
                     id_categoria = get_or_create_by_nome(cur, "categorias", "id_categoria", r["NOME_CATEGORIA"])
                     upsert_historizado(
-                        cur, "produtos", "id_produto", ["sistema_origem", "id_produto_origem"],
+                        cur, "produtos", "id_versao_produto", "id_produto", ["sistema_origem", "id_produto_origem"],
                         ["Mercearia", str(r["ID_PRODUTO"])],
                         ["nome", "valor", "moeda", "id_categoria"],
                         (r["PRODUTO"], r["VALOR_VENDA"], "BRL", id_categoria),
@@ -366,7 +367,7 @@ def atualizar_corporativo_produtos():
                 for product_id, product_name, unit_price, category_name in produtos_northwind:
                     id_categoria = get_or_create_by_nome(cur, "categorias", "id_categoria", category_name)
                     upsert_historizado(
-                        cur, "produtos", "id_produto", ["sistema_origem", "id_produto_origem"],
+                        cur, "produtos", "id_versao_produto", "id_produto", ["sistema_origem", "id_produto_origem"],
                         ["Northwind", str(product_id)],
                         ["nome", "valor", "moeda", "id_categoria"],
                         (product_name, unit_price, "USD", id_categoria),
@@ -409,7 +410,7 @@ def atualizar_corporativo_funcionario():
                     )
                     id_cargo = get_or_create_by_nome(cur, "cargos", "id_cargo", title) if title else None
                     upsert_historizado(
-                        cur, "funcionarios", "id_funcionario", ["sistema_origem", "id_funcionario_origem"],
+                        cur, "funcionarios", "id_versao_funcionario", "id_funcionario", ["sistema_origem", "id_funcionario_origem"],
                         ["Northwind", str(eid)],
                         ["nome", "data_contratacao", "id_cargo", "id_endereco"],
                         (f"{first} {last}", hire_date, id_cargo, id_endereco),
@@ -511,8 +512,8 @@ def carregar_corporativo_vendas():
             """)
             staged_mercearia = cur.fetchall()
             cur.execute("""
-                SELECT order_id, customer_id, employee_id, order_date, ship_via,
-                       product_id, quantity, unit_price, discount
+                SELECT order_id, customer_id, employee_id, order_date, required_date, shipped_date,
+                       ship_via, freight, product_id, quantity, unit_price, discount
                 FROM staging.stg_vendas_northwind
             """)
             staged_northwind = cur.fetchall()
@@ -522,13 +523,16 @@ def carregar_corporativo_vendas():
             for (id_venda, id_pessoa, id_endereco, data_venda, tipo_venda,
                  id_itemvenda, id_produto, quantidade, vlr_unitario) in staged_mercearia:
                 iv = inserir_corporativo_venda_mercearia(cur, id_venda, id_pessoa, data_venda, tipo_venda, venda_id_cache)
-                inserir_corporativo_item_venda(cur, iv, str(id_itemvenda), id_produto, quantidade, vlr_unitario)
+                inserir_corporativo_item_venda(cur, "Mercearia", iv, str(id_itemvenda), id_produto, quantidade, vlr_unitario)
                 n += 1
 
-            for (order_id, customer_id, employee_id, order_date, ship_via,
-                 product_id, quantity, unit_price, discount) in staged_northwind:
-                iv = inserir_corporativo_venda_northwind(cur, order_id, customer_id, employee_id, order_date, ship_via, venda_id_cache)
-                inserir_corporativo_item_venda(cur, iv, None, product_id, quantity, unit_price, float(unit_price) * float(quantity) * float(discount))
+            for (order_id, customer_id, employee_id, order_date, required_date, shipped_date,
+                 ship_via, freight, product_id, quantity, unit_price, discount) in staged_northwind:
+                iv = inserir_corporativo_venda_northwind(
+                    cur, order_id, customer_id, employee_id, order_date, ship_via, venda_id_cache,
+                    required_date=required_date, shipped_date=shipped_date, freight=freight,
+                )
+                inserir_corporativo_item_venda(cur, "Northwind", iv, None, product_id, quantity, unit_price, float(unit_price) * float(quantity) * float(discount))
                 n += 1
         pg_conn.commit()
         print(f"corporativo.vendas/item_venda: {n} itens novos inseridos")
@@ -781,6 +785,64 @@ def carregar_marting_fato_compras():
         pg_conn.close()
 
 
+def carregar_marting_fato_entregas():
+    """Mart Logística/Entregas: grão de pedido (não item) — agrega
+    staging.stg_vendas_northwind por order_id antes de inserir. Exclusivo do
+    Northwind, mesma decisão de modelagem da carga inicial."""
+    pg_conn = get_pg_conn("dw")
+    try:
+        with pg_conn.cursor() as cur:
+            cur.execute("SELECT data, id_dim_tempo FROM dim_tempos")
+            tempo_map = {r[0]: r[1] for r in cur.fetchall()}
+            cur.execute("SELECT id_cliente_original, id_dim_cliente FROM dim_clientes WHERE sistema_origem = 'Northwind'")
+            cliente_map = {r[0]: r[1] for r in cur.fetchall()}
+            cur.execute("SELECT id_funcionario_original, id_dim_funcionario FROM dim_funcionarios WHERE sistema_origem = 'Northwind'")
+            funcionario_map = {r[0]: r[1] for r in cur.fetchall()}
+            cur.execute("SELECT id_transportadora_original, id_dim_transportadora FROM dim_transportadoras WHERE sistema_origem = 'Northwind'")
+            transportadora_map = {r[0]: r[1] for r in cur.fetchall()}
+            cur.execute("SELECT id_endereco_original, id_dim_endereco FROM dim_enderecos WHERE sistema_origem = 'Northwind'")
+            endereco_map = {r[0]: r[1] for r in cur.fetchall()}
+
+            cur.execute("""
+                SELECT order_id, customer_id, employee_id, order_date, required_date, shipped_date, ship_via, freight,
+                       SUM(quantity * unit_price * (1 - discount)) AS valor_pedido
+                FROM staging.stg_vendas_northwind
+                GROUP BY order_id, customer_id, employee_id, order_date, required_date, shipped_date, ship_via, freight
+            """)
+            pedidos = cur.fetchall()
+
+        rows = []
+        for (order_id, customer_id, employee_id, order_date, required_date, shipped_date,
+             ship_via, freight, valor_pedido) in pedidos:
+            prazo_dias = (required_date - order_date).days if required_date else None
+            dias_para_envio = (shipped_date - order_date).days if shipped_date else None
+            atraso_dias = (shipped_date - required_date).days if (shipped_date and required_date) else None
+            rows.append((
+                "Northwind", str(order_id),
+                tempo_map.get(order_date),
+                tempo_map.get(shipped_date) if shipped_date else None,
+                cliente_map.get(customer_id),
+                funcionario_map.get(str(employee_id), -1) if employee_id else -1,
+                transportadora_map.get(str(ship_via), -1) if ship_via else -1,
+                endereco_map.get(customer_id),
+                valor_pedido, freight, prazo_dias, dias_para_envio, atraso_dias,
+            ))
+
+        if rows:
+            with pg_conn.cursor() as cur:
+                psycopg2.extras.execute_values(cur, """
+                    INSERT INTO fato_entregas
+                        (sistema_origem, id_venda_original, id_dim_tempo_pedido, id_dim_tempo_envio,
+                         id_dim_cliente, id_dim_funcionario, id_dim_transportadora, id_dim_endereco,
+                         valor_pedido, valor_frete, prazo_dias, dias_para_envio, atraso_dias)
+                    VALUES %s
+                """, rows)
+            pg_conn.commit()
+        print(f"fato_entregas: {len(rows)} pedidos novos inseridos")
+    finally:
+        pg_conn.close()
+
+
 def limpar_staging():
     pg_conn = get_pg_conn("dw")
     try:
@@ -824,6 +886,7 @@ with DAG(
 
     t_mart_fato_vendas = PythonOperator(task_id="carregar_marting_fato_vendas", python_callable=carregar_marting_fato_vendas)
     t_mart_fato_compras = PythonOperator(task_id="carregar_marting_fato_compras", python_callable=carregar_marting_fato_compras)
+    t_mart_fato_entregas = PythonOperator(task_id="carregar_marting_fato_entregas", python_callable=carregar_marting_fato_entregas)
 
     t_limpar_staging = PythonOperator(task_id="limpar_staging", python_callable=limpar_staging)
 
@@ -841,5 +904,5 @@ with DAG(
     mart_dims = [t_mart_dim_clientes, t_mart_dim_produtos, t_mart_dim_enderecos,
                  t_mart_dim_funcionarios, t_mart_dim_transportadoras, t_mart_dim_fornecedores]
     cross_downstream([t_corp_vendas, t_corp_compras], mart_dims)
-    cross_downstream(mart_dims, [t_mart_fato_vendas, t_mart_fato_compras])
-    [t_mart_fato_vendas, t_mart_fato_compras] >> t_limpar_staging
+    cross_downstream(mart_dims, [t_mart_fato_vendas, t_mart_fato_compras, t_mart_fato_entregas])
+    [t_mart_fato_vendas, t_mart_fato_compras, t_mart_fato_entregas] >> t_limpar_staging
