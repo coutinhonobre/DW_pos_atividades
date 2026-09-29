@@ -322,6 +322,72 @@
         <mxCell id="edge_9" value="id_dim_endereco" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERmany;startFill=0;endArrow=ERone;endFill=0;fontSize=10;labelBackgroundColor=#ffffff;" parent="1" source="fato_compras" target="dim_enderecos" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
+        <mxCell id="fato_entregas" value="fato_entregas" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=13;align=center;verticalAlign=top;horizontal=1;" parent="1" vertex="1">
+          <mxGeometry x="1150" y="920" width="280" height="390" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_id_fato_entrega" value="&lt;b&gt;PK id_fato_entrega&lt;/b&gt; : BIGINT" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="30" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_sistema_origem" value="sistema_origem : VARCHAR(20)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="54" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_id_venda_original" value="id_venda_original : VARCHAR(50)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="78" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_id_dim_tempo_pedido" value="FK id_dim_tempo_pedido : INT" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="102" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_id_dim_tempo_envio" value="FK id_dim_tempo_envio : INT" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="126" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_id_dim_cliente" value="FK id_dim_cliente : INT" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="150" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_id_dim_funcionario" value="FK id_dim_funcionario : INT" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="174" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_id_dim_transportadora" value="FK id_dim_transportadora : INT" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="198" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_id_dim_endereco" value="FK id_dim_endereco : INT" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="222" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_valor_pedido" value="valor_pedido : NUMERIC(15,2)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="246" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_valor_frete" value="valor_frete : NUMERIC(15,2)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="270" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_prazo_dias" value="prazo_dias : INT" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="294" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_dias_para_envio" value="dias_para_envio : INT" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="318" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_atraso_dias" value="atraso_dias : INT" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="342" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="fato_entregas_data_carga" value="data_carga : TIMESTAMP" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=8;fontSize=11;whiteSpace=nowrap;overflow=hidden;portConstraint=eastwest;" parent="fato_entregas" vertex="1">
+          <mxGeometry y="366" width="280" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_10" value="id_dim_tempo_pedido" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERmany;startFill=0;endArrow=ERone;endFill=0;fontSize=10;labelBackgroundColor=#ffffff;" parent="1" source="fato_entregas_id_dim_tempo_pedido" target="dim_tempo" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_11" value="id_dim_tempo_envio" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERmany;startFill=0;endArrow=ERone;endFill=0;fontSize=10;labelBackgroundColor=#ffffff;" parent="1" source="fato_entregas_id_dim_tempo_envio" target="dim_tempo" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_12" value="id_dim_cliente" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERmany;startFill=0;endArrow=ERone;endFill=0;fontSize=10;labelBackgroundColor=#ffffff;" parent="1" source="fato_entregas_id_dim_cliente" target="dim_cliente" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_13" value="id_dim_funcionario" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERmany;startFill=0;endArrow=ERone;endFill=0;fontSize=10;labelBackgroundColor=#ffffff;" parent="1" source="fato_entregas_id_dim_funcionario" target="dim_funcionario" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_14" value="id_dim_transportadora" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERmany;startFill=0;endArrow=ERone;endFill=0;fontSize=10;labelBackgroundColor=#ffffff;" parent="1" source="fato_entregas_id_dim_transportadora" target="dim_transportadora" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_15" value="id_dim_endereco" style="edgeStyle=entityRelationEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=ERmany;startFill=0;endArrow=ERone;endFill=0;fontSize=10;labelBackgroundColor=#ffffff;" parent="1" source="fato_entregas_id_dim_endereco" target="dim_enderecos" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

@@ -16,4 +16,5 @@ done
 
 echo "Pronto. Postgres em localhost:5432 (northwind/dw) e MySQL em localhost:3306 (mercearia)."
 echo "Airflow em http://localhost:8080 (pode levar 1-2 min pra ficar disponível)."
-echo "Usuário/senha do Airflow: veja 'docker logs dw_airflow' (gerados no primeiro start)."
+echo "Usuário/senha do Airflow: airflow / airflow."
+echo "Metabase em http://localhost:3000 (o container metabase-setup provisiona o painel via API sozinho, ver 'docker compose logs -f metabase-setup')."
