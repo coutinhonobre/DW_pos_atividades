@@ -20,3 +20,5 @@ pdflatex -shell-escape modelo-ifg.tex
 ```
 
 O PDF gerado é `relatorio/modelo-ifg.pdf`.
+
+O relatório usa o template oficial de trabalhos do IFG, [classe-ifg](https://github.com/raphaeldeaquino/classe-ifg), do Prof. Dr. Raphael de Aquino.
