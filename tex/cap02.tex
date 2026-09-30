@@ -1,0 +1,9 @@
+\chapter{Ambiente e Sistemas de Origem}
+\label{cap:fundamentacao}
+
+O DW Organizacional segue Inmon \cite{inmon2005} e os Data Marts seguem Kimball \cite{kimball2013,kimball2004}. O ambiente é containerizado (\textit{Docker Compose}): Northwind em PostgreSQL, Mercearia em MySQL, o DW também em PostgreSQL, ETL via Apache Airflow e análise via Metabase.
+
+\begin{itemize}
+    \item \textbf{Northwind}: distribuidora de alimentos por atacado (830 pedidos); única origem com frete e prazo de entrega;
+    \item \textbf{Mercearia}: comércio varejista fictício, dados sintéticos via Faker (500 pessoas, 100 produtos, 500 compras, 1.500 vendas); única origem com compra a fornecedor.
+\end{itemize}

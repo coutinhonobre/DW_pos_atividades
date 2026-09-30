@@ -1,0 +1,14 @@
+\chapter{Introdução}
+\label{cap:intro}
+
+Este é o relatório da disciplina Tópicos Avançados em Inteligência Artificial I. A partir dos \sigla{DDL}{\textit{Data Definition Language}} do Northwind e da Mercearia, a atividade pede:
+
+\begin{enumerate}
+    \item construir o \sigla{DW}{Data Warehouse} Organizacional integrando as duas bases;
+    \item a partir dele, apresentar pelo menos três modelagens de Data Mart, indicando assuntos, fatos e dimensões, e justificando seus usos;
+    \item usar uma ferramenta de análise de dados e aplicá-la ao DW e aos Data Marts.
+\end{enumerate}
+
+O enunciado também pede que sejam indicados os dados externos e a dimensão Tempo, respeitando os conceitos de granularidade, integração e historicidade. A carga foi feita com uma ferramenta de \sigla{ETL}{\textit{Extract, Transform, Load}} (Apache Airflow).
+
+Os entregáveis são os DDL do DW e dos Data Marts (\autoref{apend:ddl-dw} e \autoref{apend:ddl-marts}) e este relatório técnico. Todo o código-fonte está no repositório \url{https://github.com/coutinhonobre/DW_pos_atividades}.

@@ -1,0 +1,102 @@
+\immediate\write18{makeindex -s nomencl.ist -o "\jobname.nls" "\jobname.nlo"}
+
+% Relatório técnico da disciplina Tópicos Avançados em Inteligência
+% Artificial I -- Especialização em Inteligência Artificial Aplicada (IFG)
+\documentclass[relatorio]{formatacao/classe-ifg}
+% Opções da classe-ifg (ao usar mais de uma, separe por vírgulas):
+%   [tese]  	              	-> Tese de doutorado.
+%   [dissertacao]     	-> Dissertação de mestrado (padrão).
+%   [monografia]     	-> Monografia de especialização.
+%   [tcc]   	              	-> Trabalho de conclusão de curso (graduação).
+%   [qualificacaom]  	-> Qualificação de mestrado.
+%   [qualificacaoe]   	-> Qualificação de especialização.
+%   [qualificacaot]   	-> Qualificação de TCC.
+%   [preprojetom]   	-> Pré-projeto de mestrado.
+%   [preprojetoe]    	-> Pré-projeto de especialização.
+%   [preprojetot]    	-> Pré-projeto de TCC.
+%   [relatorio]    		-> Relatório de disciplina.
+
+% Caso precise, corrija hifenização aqui
+\hyphenation{mo-no-gra-fi-a pro-ces-so}
+
+%INICIO DO DOCUMENTO ---------------------------------------------- %
+\begin{document}
+
+
+
+
+% EDITAR - Todos os cursos  ------------------------------------------- %
+% -------- Autor(es)
+\autor{Igor Coutinho Ferreira Nobre}
+% -------- Título e subtitulo
+\titulo{Data Warehouse Organizacional e Data Marts}
+\subtitulo{Integração das bases Northwind e Mercearia, modelagem dimensional}
+% -------- Curso
+\tipocurso{Especialização}
+\curso{Inteligência Artificial Aplicada}
+% Inserir apenas no caso de relatório de disciplina
+\disciplina{Tópicos Avançados em Inteligência Artificial I}
+% -------- Local e data
+\campus{Goiânia} % Câmpus em foi desenvolvido o trabalho
+\dia{29} % Data de entrega do relatório
+\mes{09} % Formato numérico: \dia{01}, \mes{01} e \ano{2007}
+\ano{2026} %
+% -------- Orientador(a)
+\orientador{Dr. Sirlon Diniz de Carvalho}
+
+
+
+% NÃO EDITAR. Se necessário edite apenas os arquivos na pasta "pre" %
+\capa
+\termo
+\rosto % Primeira folha interna do trabalho
+\ficha
+\aprovacao
+% Para o tipo [relatorio], \tabelas chama \cresumopre internamente ao
+% final (independente do que foi passado nas opções), compondo o Resumo a
+% partir de pre/preResumo.tex. Este relatório não usa Resumo; a linha
+% abaixo neutraliza essa chamada sem alterar a classe-ifg.
+\renewcommand{\cresumopre}{}
+\tabelas
+\cleardoublepage
+\tableofcontents
+\cleardoublepage
+
+
+
+% EDITAR - Todos os cursos --------------------------------------- %
+% Arquivos com o texto do documento. Para facilitar a organização é
+% recomendado criar um arquivo para cada capítulo. O nome do arquivo
+% pode ser qualquer um, desde que contenha apenas letras e números.
+% Certifique-se de que os nomes coincidem com o que foi incluído
+\input{./tex/cap01}
+\input{./tex/cap02}
+\input{./tex/cap03}
+\input{./tex/cap04}
+\input{./tex/cap05}
+\input{./tex/cap06}
+
+
+
+% NÃO EDITAR ------------------------------------------------------ %
+\bibliografia
+
+
+
+% EDITAR - Todos os cursos ---------------------------------------- %
+% Use o trecho abaixo para inserir apêndices e anexos usando o
+% comando input da mesma forma que para capítulos. NÃO edite nem
+% altere a ordem dos comandos \apendices e \anexos.
+% Se não houver apêndice e anexo remova os comandos input
+% equivalentes
+% ---- Apêndices
+\apendices
+\input{./apendices/apendI}
+\input{./apendices/apendII}
+\input{./apendices/apendIII}
+
+\end{document}
+
+%------------------------------------------------------------------ %
+%         F I M   D O  A R Q U I V O :  modelo-ifg.tex         %
+%------------------------------------------------------------------ %
