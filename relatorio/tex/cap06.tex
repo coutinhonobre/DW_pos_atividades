@@ -1,0 +1,6 @@
+\chapter{Conclusão}
+\label{cap:conclusao}
+
+O DW Organizacional foi construído integrando Northwind e Mercearia, com os três Data Marts (Vendas, Compras e Logística) derivados dele, carga via Airflow e o catálogo de metadados documentando a origem de cada campo. Os painéis no Metabase mostram que o modelo responde às perguntas de negócio propostas para cada Data Mart. Como próximo passo, a carga incremental poderia rodar em um agendamento automático, em vez de disparada manualmente.
+
+Uma dificuldade do processo foi conciliar o código do ETL com o catálogo de metadados: como a lógica de carga está \textit{hard-coded} nas DAGs do Airflow, cada regra de transformação precisou ser descrita manualmente na tabela \texttt{algoritmo\_etl}, em vez de o catálogo ser gerado a partir do próprio código.

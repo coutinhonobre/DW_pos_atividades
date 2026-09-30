@@ -1,0 +1,32 @@
+\chapter{Data Marts}
+\label{cap:datamarts}
+
+Três Data Marts em esquema estrela (Kimball), com arquitetura de barramento: \texttt{dim\_tempos}, \texttt{dim\_enderecos}, \texttt{dim\_produtos} e \texttt{dim\_clientes} são conformadas entre os dois sistemas; \texttt{dim\_funcionarios} e \texttt{dim\_transportadoras} usam o membro \texttt{-1} ("Não aplicável") para a Mercearia; \texttt{dim\_fornecedores} é exclusiva do Mart Compras.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{./fig/dw_estrela.png}
+  \caption{Diagrama entidade-relacionamento dos Data Marts}
+  \label{fig:dw-estrela}
+  \fontefig{Elaborada pelo autor.}
+\end{figure}
+
+\begin{quadro}[H]
+\centering
+\caption{Os três Data Marts: assunto, fato, grão, origem, dimensões e uso}
+\label{qua:resumo-marts}
+\begin{tabular}{p{1.8cm}p{2.4cm}p{1.9cm}p{3.4cm}p{4.7cm}}
+\hline
+\textbf{Mart} & \textbf{Fato / Grão} & \textbf{Origem} & \textbf{Dimensões} & \textbf{Uso} \\
+\hline
+Vendas & \texttt{fato\_vendas} (item vendido) & Northwind e Mercearia & tempo, cliente, produto, endereço, funcionário, transportadora & receita, mix de produtos, desempenho por vendedor/região \\
+Compras & \texttt{fato\_compras} (item comprado) & Mercearia & tempo, fornecedor, produto, endereço & \textit{lead time}, dependência e custo de fornecedor \\
+Logística e Entregas & \texttt{fato\_entregas} (pedido) & Northwind & tempo (pedido/envio), cliente, funcionário, transportadora, endereço & prazo de entrega e desempenho de transportadora, não só valor vendido \\
+\hline
+\end{tabular}
+\fontequa{Elaborado pelo autor.}
+\end{quadro}
+
+O Mart Logística tem grão de \textbf{pedido} (não de item) de propósito, já que frete e prazo são atributos do pedido como um todo. É exclusivo do Northwind, único sistema com esse conceito, pois a Mercearia não expede fisicamente. Duas decisões de modelagem: sem conversão cambial entre moedas (campo \texttt{moeda} em \texttt{dim\_produtos}); \texttt{faixa\_renda}/\texttt{faixa\_etaria} em \texttt{dim\_clientes} são faixas descritivas, não valores brutos.
+
+DDL completo no \autoref{apend:ddl-marts}.
